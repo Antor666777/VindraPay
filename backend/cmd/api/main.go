@@ -12,10 +12,15 @@ import (
 
 	"vindrapay-go/internal/config"
 	"vindrapay-go/internal/database"
+	db "vindrapay-go/internal/db"
 	"vindrapay-go/internal/router"
+	"vindrapay-go/internal/services"
 )
 
-const shutdownTimeout = 10 * time.Second
+const (
+	shutdownTimeout = 10 * time.Second
+	sweepInterval   = 60 * time.Second
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -40,14 +45,45 @@ func run() error {
 	defer pool.Close()
 	log.Println("connected to postgres")
 
-	r := router.Setup(cfg, pool)
+	q := db.New(pool)
+
+	if err := services.NewSeeder(q).SeedBuiltins(ctx); err != nil {
+		log.Fatalf("seed builtin providers: %v", err)
+	}
+	log.Println("builtin providers seeded")
+
+	go func() {
+		ticker := time.NewTicker(sweepInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				count, err := q.ExpireStaleOrders(ctx)
+				if err != nil {
+					if ctx.Err() != nil {
+						return
+					}
+					log.Printf("expire stale orders: %v", err)
+					continue
+				}
+				if count > 0 {
+					log.Printf("expired %d stale order(s)", count)
+				}
+			}
+		}
+	}()
+
+	r := router.Setup(cfg, pool, q)
 
 	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
-		Handler:      r,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:              ":" + cfg.Port,
+		Handler:           r,
+		ReadTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	errCh := make(chan error, 1)

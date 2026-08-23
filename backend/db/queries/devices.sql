@@ -7,6 +7,10 @@ RETURNING *;
 SELECT * FROM devices
 WHERE token_prefix = $1 AND deactivated_at IS NULL;
 
+-- name: GetDeviceForBusiness :one
+SELECT * FROM devices
+WHERE id = $1 AND business_id = $2;
+
 -- name: ListDevicesByBusiness :many
 SELECT *,
     COALESCE(

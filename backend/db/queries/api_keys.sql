@@ -7,6 +7,11 @@ RETURNING *;
 SELECT * FROM api_keys
 WHERE key_prefix = $1;
 
+-- name: ListApiKeysByPrefix :many
+SELECT id, business_id, key_hash, revoked_at
+FROM api_keys
+WHERE key_prefix = $1;
+
 -- name: ListApiKeysByBusiness :many
 SELECT * FROM api_keys
 WHERE business_id = $1

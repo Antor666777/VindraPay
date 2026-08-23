@@ -32,6 +32,25 @@ func (q *Queries) CountRecentAttemptsByBusiness(ctx context.Context, arg CountRe
 	return attempt_count, err
 }
 
+const countRecentAttemptsByIP = `-- name: CountRecentAttemptsByIP :one
+SELECT COUNT(*) AS attempt_count
+FROM verification_attempts
+WHERE source_ip = $1
+  AND created_at > now() - ($2::int * INTERVAL '1 second')
+`
+
+type CountRecentAttemptsByIPParams struct {
+	SourceIp      *netip.Addr `json:"source_ip"`
+	WindowSeconds int32       `json:"window_seconds"`
+}
+
+func (q *Queries) CountRecentAttemptsByIP(ctx context.Context, arg CountRecentAttemptsByIPParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countRecentAttemptsByIP, arg.SourceIp, arg.WindowSeconds)
+	var attempt_count int64
+	err := row.Scan(&attempt_count)
+	return attempt_count, err
+}
+
 const insertVerificationAttempt = `-- name: InsertVerificationAttempt :exec
 INSERT INTO verification_attempts (
     business_id, order_id, submitted_trx_id, result,

@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createApiKey = `-- name: CreateApiKey :one
@@ -90,6 +91,44 @@ func (q *Queries) ListApiKeysByBusiness(ctx context.Context, businessID uuid.UUI
 			&i.LastUsedAt,
 			&i.RevokedAt,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listApiKeysByPrefix = `-- name: ListApiKeysByPrefix :many
+SELECT id, business_id, key_hash, revoked_at
+FROM api_keys
+WHERE key_prefix = $1
+`
+
+type ListApiKeysByPrefixRow struct {
+	ID         uuid.UUID          `json:"id"`
+	BusinessID uuid.UUID          `json:"business_id"`
+	KeyHash    string             `json:"key_hash"`
+	RevokedAt  pgtype.Timestamptz `json:"revoked_at"`
+}
+
+func (q *Queries) ListApiKeysByPrefix(ctx context.Context, keyPrefix string) ([]ListApiKeysByPrefixRow, error) {
+	rows, err := q.db.Query(ctx, listApiKeysByPrefix, keyPrefix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListApiKeysByPrefixRow
+	for rows.Next() {
+		var i ListApiKeysByPrefixRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.BusinessID,
+			&i.KeyHash,
+			&i.RevokedAt,
 		); err != nil {
 			return nil, err
 		}

@@ -13,8 +13,36 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const countTransactionsAfter = `-- name: CountTransactionsAfter :one
+SELECT COUNT(*) AS tx_count
+FROM transactions
+WHERE device_id = $1
+  AND provider_id = $4
+  AND id <> $2
+  AND received_at >= $3
+`
+
+type CountTransactionsAfterParams struct {
+	DeviceID   uuid.UUID `json:"device_id"`
+	ID         uuid.UUID `json:"id"`
+	ReceivedAt time.Time `json:"received_at"`
+	ProviderID uuid.UUID `json:"provider_id"`
+}
+
+func (q *Queries) CountTransactionsAfter(ctx context.Context, arg CountTransactionsAfterParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countTransactionsAfter,
+		arg.DeviceID,
+		arg.ID,
+		arg.ReceivedAt,
+		arg.ProviderID,
+	)
+	var tx_count int64
+	err := row.Scan(&tx_count)
+	return tx_count, err
+}
+
 const findTransactionByTrxIDForBusiness = `-- name: FindTransactionByTrxIDForBusiness :one
-SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at FROM transactions
+SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction FROM transactions
 WHERE trx_id = $1 AND business_id = $2
 ORDER BY received_at DESC
 LIMIT 1
@@ -40,18 +68,85 @@ func (q *Queries) FindTransactionByTrxIDForBusiness(ctx context.Context, arg Fin
 		&i.BalanceAfter,
 		&i.ReceivedAt,
 		&i.CreatedAt,
+		&i.Direction,
 	)
 	return i, err
 }
 
-const getPreviousBalance = `-- name: GetPreviousBalance :one
-SELECT balance_after
-FROM transactions
+const getLatestBalancePoint = `-- name: GetLatestBalancePoint :one
+SELECT balance, point_at, source
+FROM (
+    SELECT t.balance_after AS balance, t.received_at AS point_at, 'transaction'::text AS source
+    FROM transactions t
+    WHERE t.device_id = $1 AND t.provider_id = $2 AND t.balance_after IS NOT NULL
+    UNION ALL
+    SELECT c.balance, c.calibrated_at AS point_at, 'calibration'::text AS source
+    FROM balance_calibrations c
+    WHERE c.device_id = $1 AND c.provider_id = $2
+) points
+ORDER BY point_at DESC
+LIMIT 1
+`
+
+type GetLatestBalancePointParams struct {
+	DeviceID   uuid.UUID `json:"device_id"`
+	ProviderID uuid.UUID `json:"provider_id"`
+}
+
+type GetLatestBalancePointRow struct {
+	Balance *decimal.Decimal `json:"balance"`
+	PointAt time.Time        `json:"point_at"`
+	Source  string           `json:"source"`
+}
+
+func (q *Queries) GetLatestBalancePoint(ctx context.Context, arg GetLatestBalancePointParams) (GetLatestBalancePointRow, error) {
+	row := q.db.QueryRow(ctx, getLatestBalancePoint, arg.DeviceID, arg.ProviderID)
+	var i GetLatestBalancePointRow
+	err := row.Scan(&i.Balance, &i.PointAt, &i.Source)
+	return i, err
+}
+
+const getLatestCalibrationAfter = `-- name: GetLatestCalibrationAfter :one
+SELECT balance
+FROM balance_calibrations
 WHERE device_id = $1
-  AND balance_after IS NOT NULL
-  AND id <> $2
-  AND received_at < $3
-ORDER BY received_at DESC, created_at DESC
+  AND provider_id = $3
+  AND calibrated_at >= $2
+ORDER BY calibrated_at DESC
+LIMIT 1
+`
+
+type GetLatestCalibrationAfterParams struct {
+	DeviceID     uuid.UUID `json:"device_id"`
+	CalibratedAt time.Time `json:"calibrated_at"`
+	ProviderID   uuid.UUID `json:"provider_id"`
+}
+
+func (q *Queries) GetLatestCalibrationAfter(ctx context.Context, arg GetLatestCalibrationAfterParams) (decimal.Decimal, error) {
+	row := q.db.QueryRow(ctx, getLatestCalibrationAfter, arg.DeviceID, arg.CalibratedAt, arg.ProviderID)
+	var balance decimal.Decimal
+	err := row.Scan(&balance)
+	return balance, err
+}
+
+const getPreviousBalance = `-- name: GetPreviousBalance :one
+SELECT balance
+FROM (
+    SELECT t.balance_after AS balance, t.received_at AS point_at
+    FROM transactions t
+    WHERE t.device_id = $1
+      AND t.provider_id = $4
+      AND t.balance_after IS NOT NULL
+      AND t.id <> $2
+      AND t.received_at < $3
+    UNION ALL
+    SELECT c.balance, c.calibrated_at AS point_at
+    FROM balance_calibrations c
+    WHERE c.device_id = $1
+      AND c.provider_id = $4
+      AND c.calibrated_at < $3
+) points
+ORDER BY point_at DESC
 LIMIT 1
 `
 
@@ -59,17 +154,23 @@ type GetPreviousBalanceParams struct {
 	DeviceID   uuid.UUID `json:"device_id"`
 	ID         uuid.UUID `json:"id"`
 	ReceivedAt time.Time `json:"received_at"`
+	ProviderID uuid.UUID `json:"provider_id"`
 }
 
 func (q *Queries) GetPreviousBalance(ctx context.Context, arg GetPreviousBalanceParams) (*decimal.Decimal, error) {
-	row := q.db.QueryRow(ctx, getPreviousBalance, arg.DeviceID, arg.ID, arg.ReceivedAt)
-	var balance_after *decimal.Decimal
-	err := row.Scan(&balance_after)
-	return balance_after, err
+	row := q.db.QueryRow(ctx, getPreviousBalance,
+		arg.DeviceID,
+		arg.ID,
+		arg.ReceivedAt,
+		arg.ProviderID,
+	)
+	var balance *decimal.Decimal
+	err := row.Scan(&balance)
+	return balance, err
 }
 
 const getTransactionByID = `-- name: GetTransactionByID :one
-SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at FROM transactions
+SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction FROM transactions
 WHERE id = $1 AND business_id = $2
 `
 
@@ -93,15 +194,46 @@ func (q *Queries) GetTransactionByID(ctx context.Context, arg GetTransactionByID
 		&i.BalanceAfter,
 		&i.ReceivedAt,
 		&i.CreatedAt,
+		&i.Direction,
+	)
+	return i, err
+}
+
+const getTransactionByProviderAndTrxID = `-- name: GetTransactionByProviderAndTrxID :one
+SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction FROM transactions
+WHERE provider_id = $1 AND trx_id = $2
+`
+
+type GetTransactionByProviderAndTrxIDParams struct {
+	ProviderID uuid.UUID `json:"provider_id"`
+	TrxID      string    `json:"trx_id"`
+}
+
+func (q *Queries) GetTransactionByProviderAndTrxID(ctx context.Context, arg GetTransactionByProviderAndTrxIDParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, getTransactionByProviderAndTrxID, arg.ProviderID, arg.TrxID)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.ProviderID,
+		&i.TrxID,
+		&i.BusinessID,
+		&i.DeviceID,
+		&i.RawMessageID,
+		&i.Amount,
+		&i.SenderMsisdn,
+		&i.BalanceAfter,
+		&i.ReceivedAt,
+		&i.CreatedAt,
+		&i.Direction,
 	)
 	return i, err
 }
 
 const insertTransaction = `-- name: InsertTransaction :one
-INSERT INTO transactions (provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO transactions (provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, direction)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (provider_id, trx_id) DO NOTHING
-RETURNING id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at
+RETURNING id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction
 `
 
 type InsertTransactionParams struct {
@@ -113,6 +245,7 @@ type InsertTransactionParams struct {
 	Amount       decimal.Decimal  `json:"amount"`
 	SenderMsisdn *string          `json:"sender_msisdn"`
 	BalanceAfter *decimal.Decimal `json:"balance_after"`
+	Direction    string           `json:"direction"`
 }
 
 func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) (Transaction, error) {
@@ -125,6 +258,7 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		arg.Amount,
 		arg.SenderMsisdn,
 		arg.BalanceAfter,
+		arg.Direction,
 	)
 	var i Transaction
 	err := row.Scan(
@@ -139,6 +273,7 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		&i.BalanceAfter,
 		&i.ReceivedAt,
 		&i.CreatedAt,
+		&i.Direction,
 	)
 	return i, err
 }

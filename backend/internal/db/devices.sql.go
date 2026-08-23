@@ -130,6 +130,34 @@ func (q *Queries) GetDeviceByTokenPrefix(ctx context.Context, tokenPrefix string
 	return items, nil
 }
 
+const getDeviceForBusiness = `-- name: GetDeviceForBusiness :one
+SELECT id, business_id, name, token_hash, token_prefix, app_version, os_version, last_ping_at, deactivated_at, created_at FROM devices
+WHERE id = $1 AND business_id = $2
+`
+
+type GetDeviceForBusinessParams struct {
+	ID         uuid.UUID `json:"id"`
+	BusinessID uuid.UUID `json:"business_id"`
+}
+
+func (q *Queries) GetDeviceForBusiness(ctx context.Context, arg GetDeviceForBusinessParams) (Device, error) {
+	row := q.db.QueryRow(ctx, getDeviceForBusiness, arg.ID, arg.BusinessID)
+	var i Device
+	err := row.Scan(
+		&i.ID,
+		&i.BusinessID,
+		&i.Name,
+		&i.TokenHash,
+		&i.TokenPrefix,
+		&i.AppVersion,
+		&i.OsVersion,
+		&i.LastPingAt,
+		&i.DeactivatedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listDevicesByBusiness = `-- name: ListDevicesByBusiness :many
 SELECT id, business_id, name, token_hash, token_prefix, app_version, os_version, last_ping_at, deactivated_at, created_at,
     COALESCE(

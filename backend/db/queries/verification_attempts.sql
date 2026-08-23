@@ -16,3 +16,9 @@ SELECT * FROM verification_attempts
 WHERE business_id = $1 AND submitted_trx_id = $2
 ORDER BY created_at DESC
 LIMIT $3;
+
+-- name: CountRecentAttemptsByIP :one
+SELECT COUNT(*) AS attempt_count
+FROM verification_attempts
+WHERE source_ip = $1
+  AND created_at > now() - (sqlc.arg('window_seconds')::int * INTERVAL '1 second');

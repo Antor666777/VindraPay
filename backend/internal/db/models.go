@@ -24,6 +24,17 @@ type ApiKey struct {
 	CreatedAt  time.Time          `json:"created_at"`
 }
 
+type BalanceCalibration struct {
+	ID           uuid.UUID       `json:"id"`
+	BusinessID   uuid.UUID       `json:"business_id"`
+	DeviceID     uuid.UUID       `json:"device_id"`
+	ProviderID   uuid.UUID       `json:"provider_id"`
+	Balance      decimal.Decimal `json:"balance"`
+	Note         *string         `json:"note"`
+	CalibratedAt time.Time       `json:"calibrated_at"`
+	CreatedAt    time.Time       `json:"created_at"`
+}
+
 type Business struct {
 	ID         uuid.UUID `json:"id"`
 	Name       string    `json:"name"`
@@ -71,6 +82,8 @@ type Provider struct {
 	IsActive        bool       `json:"is_active"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
+	Direction       string     `json:"direction"`
+	MatchMode       string     `json:"match_mode"`
 }
 
 type RawMessage struct {
@@ -102,6 +115,7 @@ type Transaction struct {
 	BalanceAfter *decimal.Decimal `json:"balance_after"`
 	ReceivedAt   time.Time        `json:"received_at"`
 	CreatedAt    time.Time        `json:"created_at"`
+	Direction    string           `json:"direction"`
 }
 
 type VerificationAttempt struct {
