@@ -1,0 +1,41 @@
+# --- Go ---
+vendor/
+*.exe
+*.exe~
+*.test
+*.out
+bin/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# --- Node / TypeScript ---
+node_modules/
+dist/
+build/
+coverage/
+*.log
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Android ---
+local.properties
+.gradle/
+build/
+captures/
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+
+# --- IDE / Editors ---
+.idea/
+.vscode/
+*.swp
+
+# --- OS ---
+.DS_Store
+Thumbs.db

@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS verification_attempts;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS raw_messages;
+DROP TABLE IF EXISTS providers;
+DROP TABLE IF EXISTS devices;
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS businesses;
+DROP EXTENSION IF EXISTS pgcrypto;
