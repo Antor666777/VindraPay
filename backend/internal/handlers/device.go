@@ -32,6 +32,13 @@ type heartbeatRequest struct {
 	OsVersion  string `json:"os_version" binding:"max=128"`
 }
 
+type deviceProvider struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	SenderID  *string   `json:"sender_id"`
+	Direction string    `json:"direction"`
+}
+
 type inboundMessageRequest struct {
 	ClientMsgID      uuid.UUID  `json:"client_msg_id" binding:"required"`
 	SenderID         string     `json:"sender_id" binding:"max=64"`
@@ -79,7 +86,23 @@ func (h *DeviceHandler) Heartbeat(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true})
+	rows, err := h.q.ListActiveProvidersForMatching(c.Request.Context(), &device.BusinessID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "could not load providers"})
+		return
+	}
+
+	providers := make([]deviceProvider, 0, len(rows))
+	for _, p := range rows {
+		providers = append(providers, deviceProvider{
+			ID:        p.ID,
+			Name:      p.Name,
+			SenderID:  p.SenderID,
+			Direction: p.Direction,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"providers": providers}})
 }
 
 func (h *DeviceHandler) Messages(c *gin.Context) {
