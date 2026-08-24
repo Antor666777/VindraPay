@@ -84,6 +84,7 @@ type Provider struct {
 	UpdatedAt       time.Time  `json:"updated_at"`
 	Direction       string     `json:"direction"`
 	MatchMode       string     `json:"match_mode"`
+	Script          *string    `json:"script"`
 }
 
 type RawMessage struct {
@@ -104,18 +105,20 @@ type RawMessage struct {
 }
 
 type Transaction struct {
-	ID           uuid.UUID        `json:"id"`
-	ProviderID   uuid.UUID        `json:"provider_id"`
-	TrxID        string           `json:"trx_id"`
-	BusinessID   uuid.UUID        `json:"business_id"`
-	DeviceID     uuid.UUID        `json:"device_id"`
-	RawMessageID uuid.UUID        `json:"raw_message_id"`
-	Amount       decimal.Decimal  `json:"amount"`
-	SenderMsisdn *string          `json:"sender_msisdn"`
-	BalanceAfter *decimal.Decimal `json:"balance_after"`
-	ReceivedAt   time.Time        `json:"received_at"`
-	CreatedAt    time.Time        `json:"created_at"`
-	Direction    string           `json:"direction"`
+	ID              uuid.UUID        `json:"id"`
+	ProviderID      uuid.UUID        `json:"provider_id"`
+	TrxID           string           `json:"trx_id"`
+	BusinessID      uuid.UUID        `json:"business_id"`
+	DeviceID        uuid.UUID        `json:"device_id"`
+	RawMessageID    uuid.UUID        `json:"raw_message_id"`
+	Amount          decimal.Decimal  `json:"amount"`
+	SenderMsisdn    *string          `json:"sender_msisdn"`
+	BalanceAfter    *decimal.Decimal `json:"balance_after"`
+	ReceivedAt      time.Time        `json:"received_at"`
+	CreatedAt       time.Time        `json:"created_at"`
+	Direction       string           `json:"direction"`
+	EffectiveAmount *decimal.Decimal `json:"effective_amount"`
+	Meta            []byte           `json:"meta"`
 }
 
 type VerificationAttempt struct {

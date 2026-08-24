@@ -1,6 +1,6 @@
 -- name: CreateProvider :one
-INSERT INTO providers (business_id, name, sender_id, sms_template, compiled_pattern, priority, direction, match_mode)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO providers (business_id, name, sender_id, sms_template, compiled_pattern, priority, direction, match_mode, script)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: GetProvider :one
@@ -20,8 +20,8 @@ ORDER BY priority ASC, created_at ASC;
 
 -- name: UpdateProviderTemplate :one
 UPDATE providers
-SET sms_template = $1, compiled_pattern = $2, direction = $3, match_mode = $4, updated_at = now()
-WHERE id = $5 AND business_id = $6
+SET sms_template = $1, compiled_pattern = $2, direction = $3, script = $4, match_mode = $5, updated_at = now()
+WHERE id = $6 AND business_id = $7
 RETURNING *;
 
 -- name: SetProviderPriority :one

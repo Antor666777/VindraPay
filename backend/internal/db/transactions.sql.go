@@ -42,7 +42,7 @@ func (q *Queries) CountTransactionsAfter(ctx context.Context, arg CountTransacti
 }
 
 const findTransactionByTrxIDForBusiness = `-- name: FindTransactionByTrxIDForBusiness :one
-SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction FROM transactions
+SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction, effective_amount, meta FROM transactions
 WHERE trx_id = $1 AND business_id = $2
 ORDER BY received_at DESC
 LIMIT 1
@@ -69,6 +69,8 @@ func (q *Queries) FindTransactionByTrxIDForBusiness(ctx context.Context, arg Fin
 		&i.ReceivedAt,
 		&i.CreatedAt,
 		&i.Direction,
+		&i.EffectiveAmount,
+		&i.Meta,
 	)
 	return i, err
 }
@@ -170,7 +172,7 @@ func (q *Queries) GetPreviousBalance(ctx context.Context, arg GetPreviousBalance
 }
 
 const getTransactionByID = `-- name: GetTransactionByID :one
-SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction FROM transactions
+SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction, effective_amount, meta FROM transactions
 WHERE id = $1 AND business_id = $2
 `
 
@@ -195,12 +197,14 @@ func (q *Queries) GetTransactionByID(ctx context.Context, arg GetTransactionByID
 		&i.ReceivedAt,
 		&i.CreatedAt,
 		&i.Direction,
+		&i.EffectiveAmount,
+		&i.Meta,
 	)
 	return i, err
 }
 
 const getTransactionByProviderAndTrxID = `-- name: GetTransactionByProviderAndTrxID :one
-SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction FROM transactions
+SELECT id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction, effective_amount, meta FROM transactions
 WHERE provider_id = $1 AND trx_id = $2
 `
 
@@ -225,27 +229,31 @@ func (q *Queries) GetTransactionByProviderAndTrxID(ctx context.Context, arg GetT
 		&i.ReceivedAt,
 		&i.CreatedAt,
 		&i.Direction,
+		&i.EffectiveAmount,
+		&i.Meta,
 	)
 	return i, err
 }
 
 const insertTransaction = `-- name: InsertTransaction :one
-INSERT INTO transactions (provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, direction)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO transactions (provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, direction, effective_amount, meta)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (provider_id, trx_id) DO NOTHING
-RETURNING id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction
+RETURNING id, provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, received_at, created_at, direction, effective_amount, meta
 `
 
 type InsertTransactionParams struct {
-	ProviderID   uuid.UUID        `json:"provider_id"`
-	TrxID        string           `json:"trx_id"`
-	BusinessID   uuid.UUID        `json:"business_id"`
-	DeviceID     uuid.UUID        `json:"device_id"`
-	RawMessageID uuid.UUID        `json:"raw_message_id"`
-	Amount       decimal.Decimal  `json:"amount"`
-	SenderMsisdn *string          `json:"sender_msisdn"`
-	BalanceAfter *decimal.Decimal `json:"balance_after"`
-	Direction    string           `json:"direction"`
+	ProviderID      uuid.UUID        `json:"provider_id"`
+	TrxID           string           `json:"trx_id"`
+	BusinessID      uuid.UUID        `json:"business_id"`
+	DeviceID        uuid.UUID        `json:"device_id"`
+	RawMessageID    uuid.UUID        `json:"raw_message_id"`
+	Amount          decimal.Decimal  `json:"amount"`
+	SenderMsisdn    *string          `json:"sender_msisdn"`
+	BalanceAfter    *decimal.Decimal `json:"balance_after"`
+	Direction       string           `json:"direction"`
+	EffectiveAmount *decimal.Decimal `json:"effective_amount"`
+	Meta            []byte           `json:"meta"`
 }
 
 func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) (Transaction, error) {
@@ -259,6 +267,8 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		arg.SenderMsisdn,
 		arg.BalanceAfter,
 		arg.Direction,
+		arg.EffectiveAmount,
+		arg.Meta,
 	)
 	var i Transaction
 	err := row.Scan(
@@ -274,6 +284,8 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		&i.ReceivedAt,
 		&i.CreatedAt,
 		&i.Direction,
+		&i.EffectiveAmount,
+		&i.Meta,
 	)
 	return i, err
 }

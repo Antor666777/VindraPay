@@ -28,9 +28,14 @@ func Setup(cfg *config.Config, pool *pgxpool.Pool, q *db.Queries) *gin.Engine {
 	r.GET("/healthz", health.Health)
 	r.GET("/api/v1/ping", health.Ping)
 
+	scriptOpts := services.ScriptOptions{
+		TimeoutMs:   cfg.ScriptTimeoutMs,
+		AllowUnsafe: cfg.AllowUnsafeScripts,
+	}
+
 	orderHandler := handlers.NewOrderHandler(q, services.NewVerifyService(q))
-	deviceHandler := handlers.NewDeviceHandler(q, services.NewIngestService(q))
-	providerHandler := handlers.NewProviderHandler(q)
+	deviceHandler := handlers.NewDeviceHandler(q, services.NewIngestService(q, scriptOpts))
+	providerHandler := handlers.NewProviderHandler(q, scriptOpts)
 
 	api := r.Group("/api/v1", middleware.APIKeyAuth(q))
 	{
@@ -54,6 +59,36 @@ func Setup(cfg *config.Config, pool *pgxpool.Pool, q *db.Queries) *gin.Engine {
 	{
 		dev.POST("/heartbeat", deviceHandler.Heartbeat)
 		dev.POST("/messages", deviceHandler.Messages)
+	}
+
+	if cfg.ManagementAPIKey != "" {
+		mgmt := r.Group("/manage/v1", middleware.ManagementAuth(cfg))
+		manageHandler := handlers.NewManageHandler(q, scriptOpts)
+		{
+			mgmt.GET("/features", manageHandler.Features)
+			mgmt.GET("/businesses", manageHandler.ListBusinesses)
+			mgmt.POST("/businesses", manageHandler.CreateBusiness)
+			mgmt.GET("/businesses/:business_id", manageHandler.GetBusiness)
+			mgmt.PATCH("/businesses/:business_id/status", manageHandler.SetBusinessStatus)
+			mgmt.GET("/businesses/:business_id/api-keys", manageHandler.ListApiKeys)
+			mgmt.POST("/businesses/:business_id/api-keys", manageHandler.CreateApiKey)
+			mgmt.DELETE("/api-keys/:key_id", manageHandler.RevokeApiKey)
+			mgmt.GET("/devices", manageHandler.ListDevices)
+			mgmt.POST("/businesses/:business_id/devices", manageHandler.CreateDevice)
+			mgmt.DELETE("/devices/:device_id", manageHandler.DeactivateDevice)
+			mgmt.GET("/orders", manageHandler.ListOrders)
+			mgmt.GET("/transactions", manageHandler.ListTransactions)
+			mgmt.GET("/attempts", manageHandler.ListAttempts)
+			mgmt.GET("/messages", manageHandler.ListMessages)
+			mgmt.GET("/stats", manageHandler.Stats)
+			mgmt.GET("/providers", manageHandler.ListProviders)
+			mgmt.POST("/providers", manageHandler.CreateProvider)
+			mgmt.PUT("/providers/:id/template", manageHandler.UpdateProviderTemplate)
+			mgmt.DELETE("/providers/:id", manageHandler.DeactivateProvider)
+			mgmt.POST("/providers/test", providerHandler.Test)
+			mgmt.POST("/devices/:device_id/calibrate-balance", manageHandler.CalibrateBalance)
+			mgmt.GET("/devices/:device_id/balance", manageHandler.DeviceBalance)
+		}
 	}
 
 	r.NoRoute(func(c *gin.Context) {

@@ -14,9 +14,16 @@ import (
 type Querier interface {
 	CancelOrder(ctx context.Context, arg CancelOrderParams) (Order, error)
 	ClaimTransactionForOrder(ctx context.Context, arg ClaimTransactionForOrderParams) (Order, error)
+	CountAttempts(ctx context.Context, arg CountAttemptsParams) (int64, error)
+	CountBusinesses(ctx context.Context, arg CountBusinessesParams) (int64, error)
+	CountDevices(ctx context.Context, businessID *uuid.UUID) (int64, error)
+	CountMessages(ctx context.Context, arg CountMessagesParams) (int64, error)
+	CountOrders(ctx context.Context, arg CountOrdersParams) (int64, error)
+	CountProviders(ctx context.Context, arg CountProvidersParams) (int64, error)
 	CountRawMessagesByStatus(ctx context.Context, businessID uuid.UUID) ([]CountRawMessagesByStatusRow, error)
 	CountRecentAttemptsByBusiness(ctx context.Context, arg CountRecentAttemptsByBusinessParams) (int64, error)
 	CountRecentAttemptsByIP(ctx context.Context, arg CountRecentAttemptsByIPParams) (int64, error)
+	CountTransactions(ctx context.Context, arg CountTransactionsParams) (int64, error)
 	CountTransactionsAfter(ctx context.Context, arg CountTransactionsAfterParams) (int64, error)
 	CreateApiKey(ctx context.Context, arg CreateApiKeyParams) (ApiKey, error)
 	CreateBalanceCalibration(ctx context.Context, arg CreateBalanceCalibrationParams) (BalanceCalibration, error)
@@ -25,12 +32,15 @@ type Querier interface {
 	CreateProvider(ctx context.Context, arg CreateProviderParams) (Provider, error)
 	DeactivateDevice(ctx context.Context, arg DeactivateDeviceParams) (Device, error)
 	DeactivateProvider(ctx context.Context, arg DeactivateProviderParams) (Provider, error)
+	DeactivateProviderGlobal(ctx context.Context, id uuid.UUID) (Provider, error)
 	DeviceHeartbeat(ctx context.Context, id uuid.UUID) error
 	ExpireStaleOrders(ctx context.Context) (int64, error)
 	FindTransactionByTrxIDForBusiness(ctx context.Context, arg FindTransactionByTrxIDForBusinessParams) (Transaction, error)
+	GetApiKeyByID(ctx context.Context, id uuid.UUID) (ApiKey, error)
 	GetApiKeyByPrefix(ctx context.Context, keyPrefix string) (ApiKey, error)
 	GetBusiness(ctx context.Context, id uuid.UUID) (Business, error)
 	GetBusinessByEmail(ctx context.Context, ownerEmail string) (Business, error)
+	GetDeviceByID(ctx context.Context, id uuid.UUID) (Device, error)
 	GetDeviceByTokenPrefix(ctx context.Context, tokenPrefix string) ([]Device, error)
 	GetDeviceForBusiness(ctx context.Context, arg GetDeviceForBusinessParams) (Device, error)
 	GetGlobalProviderByName(ctx context.Context, name string) (Provider, error)
@@ -41,6 +51,7 @@ type Querier interface {
 	GetPreviousBalance(ctx context.Context, arg GetPreviousBalanceParams) (*decimal.Decimal, error)
 	GetProvider(ctx context.Context, id uuid.UUID) (Provider, error)
 	GetRawMessage(ctx context.Context, id uuid.UUID) (RawMessage, error)
+	GetStudioStats(ctx context.Context) (GetStudioStatsRow, error)
 	GetTransactionByID(ctx context.Context, arg GetTransactionByIDParams) (Transaction, error)
 	GetTransactionByProviderAndTrxID(ctx context.Context, arg GetTransactionByProviderAndTrxIDParams) (Transaction, error)
 	InsertOrder(ctx context.Context, arg InsertOrderParams) (Order, error)
@@ -51,14 +62,22 @@ type Querier interface {
 	ListApiKeysByBusiness(ctx context.Context, businessID uuid.UUID) ([]ApiKey, error)
 	ListApiKeysByPrefix(ctx context.Context, keyPrefix string) ([]ListApiKeysByPrefixRow, error)
 	ListAttemptsByTrxID(ctx context.Context, arg ListAttemptsByTrxIDParams) ([]VerificationAttempt, error)
+	ListAttemptsPaged(ctx context.Context, arg ListAttemptsPagedParams) ([]ListAttemptsPagedRow, error)
 	ListBusinesses(ctx context.Context) ([]Business, error)
+	ListBusinessesPaged(ctx context.Context, arg ListBusinessesPagedParams) ([]Business, error)
 	ListDevicesByBusiness(ctx context.Context, businessID uuid.UUID) ([]ListDevicesByBusinessRow, error)
+	ListDevicesPaged(ctx context.Context, arg ListDevicesPagedParams) ([]ListDevicesPagedRow, error)
+	ListMessagesPaged(ctx context.Context, arg ListMessagesPagedParams) ([]ListMessagesPagedRow, error)
 	ListOrdersByBusiness(ctx context.Context, arg ListOrdersByBusinessParams) ([]Order, error)
+	ListOrdersPaged(ctx context.Context, arg ListOrdersPagedParams) ([]ListOrdersPagedRow, error)
 	ListPendingRawMessages(ctx context.Context, limit int32) ([]RawMessage, error)
 	ListProblemMessagesByBusiness(ctx context.Context, arg ListProblemMessagesByBusinessParams) ([]RawMessage, error)
 	ListProvidersForBusiness(ctx context.Context, businessID *uuid.UUID) ([]Provider, error)
+	ListProvidersPaged(ctx context.Context, arg ListProvidersPagedParams) ([]ListProvidersPagedRow, error)
+	ListTransactionsPaged(ctx context.Context, arg ListTransactionsPagedParams) ([]ListTransactionsPagedRow, error)
 	MarkRawMessageError(ctx context.Context, arg MarkRawMessageErrorParams) error
 	MarkRawMessageParsed(ctx context.Context, arg MarkRawMessageParsedParams) error
+	MarkRawMessageSkipped(ctx context.Context, arg MarkRawMessageSkippedParams) error
 	MarkRawMessageUnmatched(ctx context.Context, id uuid.UUID) error
 	RevokeApiKey(ctx context.Context, arg RevokeApiKeyParams) (ApiKey, error)
 	SetBusinessStatus(ctx context.Context, arg SetBusinessStatusParams) (Business, error)
@@ -66,6 +85,7 @@ type Querier interface {
 	TouchApiKeyLastUsed(ctx context.Context, id uuid.UUID) error
 	UpdateDeviceMeta(ctx context.Context, arg UpdateDeviceMetaParams) error
 	UpdateProviderTemplate(ctx context.Context, arg UpdateProviderTemplateParams) (Provider, error)
+	UpdateProviderTemplateGlobal(ctx context.Context, arg UpdateProviderTemplateGlobalParams) (Provider, error)
 }
 
 var _ Querier = (*Queries)(nil)

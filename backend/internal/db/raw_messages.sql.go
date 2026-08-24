@@ -246,6 +246,22 @@ func (q *Queries) MarkRawMessageParsed(ctx context.Context, arg MarkRawMessagePa
 	return err
 }
 
+const markRawMessageSkipped = `-- name: MarkRawMessageSkipped :exec
+UPDATE raw_messages
+SET parse_status = 'skipped', error_code = 'REJECTED', error_detail = $2
+WHERE id = $1
+`
+
+type MarkRawMessageSkippedParams struct {
+	ID          uuid.UUID `json:"id"`
+	ErrorDetail *string   `json:"error_detail"`
+}
+
+func (q *Queries) MarkRawMessageSkipped(ctx context.Context, arg MarkRawMessageSkippedParams) error {
+	_, err := q.db.Exec(ctx, markRawMessageSkipped, arg.ID, arg.ErrorDetail)
+	return err
+}
+
 const markRawMessageUnmatched = `-- name: MarkRawMessageUnmatched :exec
 UPDATE raw_messages
 SET parse_status = 'unmatched'

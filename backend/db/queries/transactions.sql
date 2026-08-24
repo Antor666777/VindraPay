@@ -1,6 +1,6 @@
 -- name: InsertTransaction :one
-INSERT INTO transactions (provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, direction)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO transactions (provider_id, trx_id, business_id, device_id, raw_message_id, amount, sender_msisdn, balance_after, direction, effective_amount, meta)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (provider_id, trx_id) DO NOTHING
 RETURNING *;
 

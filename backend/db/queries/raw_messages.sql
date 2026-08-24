@@ -23,6 +23,11 @@ UPDATE raw_messages
 SET parse_status = 'error', error_code = $2, error_detail = $3
 WHERE id = $1;
 
+-- name: MarkRawMessageSkipped :exec
+UPDATE raw_messages
+SET parse_status = 'skipped', error_code = 'REJECTED', error_detail = $2
+WHERE id = $1;
+
 -- name: ListPendingRawMessages :many
 SELECT * FROM raw_messages
 WHERE parse_status = 'pending'

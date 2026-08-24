@@ -82,7 +82,12 @@ func (s *VerifyService) Verify(ctx context.Context, businessID uuid.UUID, extern
 		return outcome, nil
 	}
 
-	if !tx.Amount.Equal(order.ExpectedAmount) {
+	effectiveAmount := tx.Amount
+	if tx.EffectiveAmount != nil {
+		effectiveAmount = *tx.EffectiveAmount
+	}
+
+	if !effectiveAmount.Equal(order.ExpectedAmount) {
 		outcome := VerifyOutcome{
 			Result:            ResultAmountMismatch,
 			HTTPStatus:        422,
@@ -90,7 +95,7 @@ func (s *VerifyService) Verify(ctx context.Context, businessID uuid.UUID, extern
 			Transaction:       &tx,
 			BalanceConsistent: nil,
 		}
-		submittedAmount := tx.Amount
+		submittedAmount := effectiveAmount
 		s.logAttempt(ctx, businessID, &order.ID, submittedTrxID, outcome, &tx.ID, &submittedAmount, nil, sourceIP)
 		return outcome, nil
 	}

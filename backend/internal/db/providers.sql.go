@@ -12,9 +12,9 @@ import (
 )
 
 const createProvider = `-- name: CreateProvider :one
-INSERT INTO providers (business_id, name, sender_id, sms_template, compiled_pattern, priority, direction, match_mode)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode
+INSERT INTO providers (business_id, name, sender_id, sms_template, compiled_pattern, priority, direction, match_mode, script)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode, script
 `
 
 type CreateProviderParams struct {
@@ -26,6 +26,7 @@ type CreateProviderParams struct {
 	Priority        int32      `json:"priority"`
 	Direction       string     `json:"direction"`
 	MatchMode       string     `json:"match_mode"`
+	Script          *string    `json:"script"`
 }
 
 func (q *Queries) CreateProvider(ctx context.Context, arg CreateProviderParams) (Provider, error) {
@@ -38,6 +39,7 @@ func (q *Queries) CreateProvider(ctx context.Context, arg CreateProviderParams) 
 		arg.Priority,
 		arg.Direction,
 		arg.MatchMode,
+		arg.Script,
 	)
 	var i Provider
 	err := row.Scan(
@@ -53,6 +55,7 @@ func (q *Queries) CreateProvider(ctx context.Context, arg CreateProviderParams) 
 		&i.UpdatedAt,
 		&i.Direction,
 		&i.MatchMode,
+		&i.Script,
 	)
 	return i, err
 }
@@ -61,7 +64,7 @@ const deactivateProvider = `-- name: DeactivateProvider :one
 UPDATE providers
 SET is_active = false, updated_at = now()
 WHERE id = $1 AND business_id = $2
-RETURNING id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode
+RETURNING id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode, script
 `
 
 type DeactivateProviderParams struct {
@@ -85,12 +88,13 @@ func (q *Queries) DeactivateProvider(ctx context.Context, arg DeactivateProvider
 		&i.UpdatedAt,
 		&i.Direction,
 		&i.MatchMode,
+		&i.Script,
 	)
 	return i, err
 }
 
 const getGlobalProviderByName = `-- name: GetGlobalProviderByName :one
-SELECT id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode FROM providers
+SELECT id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode, script FROM providers
 WHERE business_id IS NULL AND name = $1
 `
 
@@ -110,12 +114,13 @@ func (q *Queries) GetGlobalProviderByName(ctx context.Context, name string) (Pro
 		&i.UpdatedAt,
 		&i.Direction,
 		&i.MatchMode,
+		&i.Script,
 	)
 	return i, err
 }
 
 const getProvider = `-- name: GetProvider :one
-SELECT id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode FROM providers
+SELECT id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode, script FROM providers
 WHERE id = $1
 `
 
@@ -135,12 +140,13 @@ func (q *Queries) GetProvider(ctx context.Context, id uuid.UUID) (Provider, erro
 		&i.UpdatedAt,
 		&i.Direction,
 		&i.MatchMode,
+		&i.Script,
 	)
 	return i, err
 }
 
 const listActiveProvidersForMatching = `-- name: ListActiveProvidersForMatching :many
-SELECT id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode FROM providers
+SELECT id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode, script FROM providers
 WHERE is_active = true
   AND (business_id IS NULL OR business_id = $1)
 ORDER BY priority ASC, business_id IS NULL ASC, created_at ASC
@@ -168,6 +174,7 @@ func (q *Queries) ListActiveProvidersForMatching(ctx context.Context, businessID
 			&i.UpdatedAt,
 			&i.Direction,
 			&i.MatchMode,
+			&i.Script,
 		); err != nil {
 			return nil, err
 		}
@@ -180,7 +187,7 @@ func (q *Queries) ListActiveProvidersForMatching(ctx context.Context, businessID
 }
 
 const listProvidersForBusiness = `-- name: ListProvidersForBusiness :many
-SELECT id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode FROM providers
+SELECT id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode, script FROM providers
 WHERE business_id IS NULL OR business_id = $1
 ORDER BY priority ASC, created_at ASC
 `
@@ -207,6 +214,7 @@ func (q *Queries) ListProvidersForBusiness(ctx context.Context, businessID *uuid
 			&i.UpdatedAt,
 			&i.Direction,
 			&i.MatchMode,
+			&i.Script,
 		); err != nil {
 			return nil, err
 		}
@@ -222,7 +230,7 @@ const setProviderPriority = `-- name: SetProviderPriority :one
 UPDATE providers
 SET priority = $2, updated_at = now()
 WHERE id = $1 AND business_id = $3
-RETURNING id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode
+RETURNING id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode, script
 `
 
 type SetProviderPriorityParams struct {
@@ -247,21 +255,23 @@ func (q *Queries) SetProviderPriority(ctx context.Context, arg SetProviderPriori
 		&i.UpdatedAt,
 		&i.Direction,
 		&i.MatchMode,
+		&i.Script,
 	)
 	return i, err
 }
 
 const updateProviderTemplate = `-- name: UpdateProviderTemplate :one
 UPDATE providers
-SET sms_template = $1, compiled_pattern = $2, direction = $3, match_mode = $4, updated_at = now()
-WHERE id = $5 AND business_id = $6
-RETURNING id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode
+SET sms_template = $1, compiled_pattern = $2, direction = $3, script = $4, match_mode = $5, updated_at = now()
+WHERE id = $6 AND business_id = $7
+RETURNING id, business_id, name, sender_id, sms_template, compiled_pattern, priority, is_active, created_at, updated_at, direction, match_mode, script
 `
 
 type UpdateProviderTemplateParams struct {
 	SmsTemplate     string     `json:"sms_template"`
 	CompiledPattern string     `json:"compiled_pattern"`
 	Direction       string     `json:"direction"`
+	Script          *string    `json:"script"`
 	MatchMode       string     `json:"match_mode"`
 	ID              uuid.UUID  `json:"id"`
 	BusinessID      *uuid.UUID `json:"business_id"`
@@ -272,6 +282,7 @@ func (q *Queries) UpdateProviderTemplate(ctx context.Context, arg UpdateProvider
 		arg.SmsTemplate,
 		arg.CompiledPattern,
 		arg.Direction,
+		arg.Script,
 		arg.MatchMode,
 		arg.ID,
 		arg.BusinessID,
@@ -290,6 +301,7 @@ func (q *Queries) UpdateProviderTemplate(ctx context.Context, arg UpdateProvider
 		&i.UpdatedAt,
 		&i.Direction,
 		&i.MatchMode,
+		&i.Script,
 	)
 	return i, err
 }

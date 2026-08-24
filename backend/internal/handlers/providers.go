@@ -3,23 +3,27 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"vindrapay-go/internal/middleware"
+	"vindrapay-go/internal/scripting"
+	"vindrapay-go/internal/services"
 	"vindrapay-go/internal/smsparser"
 
 	db "vindrapay-go/internal/db"
 )
 
 type ProviderHandler struct {
-	q *db.Queries
+	q    *db.Queries
+	opts services.ScriptOptions
 }
 
-func NewProviderHandler(q *db.Queries) *ProviderHandler {
-	return &ProviderHandler{q: q}
+func NewProviderHandler(q *db.Queries, opts services.ScriptOptions) *ProviderHandler {
+	return &ProviderHandler{q: q, opts: opts}
 }
 
 const (
@@ -34,18 +38,21 @@ type createProviderRequest struct {
 	Priority    *int32 `json:"priority,omitempty"`
 	Direction   string `json:"direction" binding:"omitempty,oneof=credit debit"`
 	MatchMode   string `json:"match_mode" binding:"omitempty,oneof=template regex"`
+	Script      string `json:"script"`
 }
 
 type updateTemplateRequest struct {
 	SMSTemplate string `json:"sms_template" binding:"required,max=1024"`
 	Direction   string `json:"direction" binding:"omitempty,oneof=credit debit"`
 	MatchMode   string `json:"match_mode" binding:"omitempty,oneof=template regex"`
+	Script      string `json:"script"`
 }
 
 type testTemplateRequest struct {
 	SMSTemplate string `json:"sms_template" binding:"required,max=1024"`
 	SampleBody  string `json:"sample_body" binding:"required,max=4096"`
 	MatchMode   string `json:"match_mode" binding:"omitempty,oneof=template regex"`
+	Script      string `json:"script,omitempty"`
 }
 
 func compileByMode(mode, template string) (*smsparser.Template, error) {
@@ -53,6 +60,24 @@ func compileByMode(mode, template string) (*smsparser.Template, error) {
 		return smsparser.CompileRegex(template)
 	}
 	return smsparser.Compile(template)
+}
+
+func invalidScript(c *gin.Context, err error) {
+	c.JSON(http.StatusBadRequest, gin.H{
+		"success": false,
+		"error":   "invalid script: " + err.Error(),
+	})
+}
+
+func validateScriptRequest(c *gin.Context, script string) bool {
+	if script == "" {
+		return true
+	}
+	if err := scripting.Validate(script); err != nil {
+		invalidScript(c, err)
+		return false
+	}
+	return true
 }
 
 func invalidTemplate(c *gin.Context, err error) {
@@ -72,6 +97,10 @@ func (h *ProviderHandler) Create(c *gin.Context) {
 	var req createProviderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request body"})
+		return
+	}
+
+	if !validateScriptRequest(c, req.Script) {
 		return
 	}
 
@@ -101,6 +130,11 @@ func (h *ProviderHandler) Create(c *gin.Context) {
 		direction = "credit"
 	}
 
+	var scriptPtr *string
+	if req.Script != "" {
+		scriptPtr = &req.Script
+	}
+
 	provider, err := h.q.CreateProvider(c.Request.Context(), db.CreateProviderParams{
 		BusinessID:      &businessID,
 		Name:            req.Name,
@@ -110,6 +144,7 @@ func (h *ProviderHandler) Create(c *gin.Context) {
 		Priority:        priority,
 		Direction:       direction,
 		MatchMode:       matchMode,
+		Script:          scriptPtr,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "could not create provider"})
@@ -180,6 +215,10 @@ func (h *ProviderHandler) UpdateTemplate(c *gin.Context) {
 		return
 	}
 
+	if !validateScriptRequest(c, req.Script) {
+		return
+	}
+
 	matchMode := req.MatchMode
 	if matchMode == "" {
 		matchMode = "template"
@@ -196,12 +235,18 @@ func (h *ProviderHandler) UpdateTemplate(c *gin.Context) {
 		direction = "credit"
 	}
 
+	var scriptPtr *string
+	if req.Script != "" {
+		scriptPtr = &req.Script
+	}
+
 	provider, err := h.q.UpdateProviderTemplate(c.Request.Context(), db.UpdateProviderTemplateParams{
 		ID:              providerID,
 		BusinessID:      &businessID,
 		SmsTemplate:     req.SMSTemplate,
 		CompiledPattern: tpl.Pattern.String(),
 		Direction:       direction,
+		Script:          scriptPtr,
 		MatchMode:       matchMode,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -269,6 +314,10 @@ func (h *ProviderHandler) Test(c *gin.Context) {
 		return
 	}
 
+	if !validateScriptRequest(c, req.Script) {
+		return
+	}
+
 	var fields *smsparser.Fields
 	var err error
 	if req.MatchMode == "regex" {
@@ -286,11 +335,59 @@ func (h *ProviderHandler) Test(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"match":  true,
-			"fields": fieldsToMap(fields),
-		},
-	})
+	data := gin.H{
+		"match":  true,
+		"fields": fieldsToMap(fields),
+	}
+
+	if req.Script != "" {
+		out, rerr := scripting.Run(
+			req.Script,
+			scriptingInputFromFields(fields, req.SampleBody),
+			time.Duration(h.opts.TimeoutMs)*time.Millisecond,
+			h.opts.AllowUnsafe,
+		)
+		if rerr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": rerr.Error()})
+			return
+		}
+		transformed := gin.H{}
+		if out.EffectiveAmount != nil {
+			transformed["amount"] = out.EffectiveAmount.String()
+		}
+		if out.Sender != nil {
+			transformed["sender"] = *out.Sender
+		}
+		if out.BalanceAfterOverride != nil {
+			transformed["balance"] = out.BalanceAfterOverride.String()
+		}
+		if out.TrxIDOverride != nil {
+			transformed["trx_id"] = *out.TrxIDOverride
+		}
+		if out.Meta != nil {
+			transformed["meta"] = out.Meta
+		}
+		data["transformed"] = transformed
+		if out.Rejected {
+			data["rejected"] = true
+			data["reject_reason"] = out.RejectReason
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": data})
+}
+
+func scriptingInputFromFields(f *smsparser.Fields, body string) scripting.Input {
+	amount := f.Amount.InexactFloat64()
+	in := scripting.Input{
+		Amount: &amount,
+		Sender: f.Sender,
+		TrxID:  f.TrxID,
+		Body:   body,
+	}
+	if f.Balance != nil {
+		b := f.Balance.InexactFloat64()
+		in.Balance = &b
+	}
+	return in
 }

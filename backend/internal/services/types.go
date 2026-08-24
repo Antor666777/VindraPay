@@ -13,6 +13,7 @@ const (
 	MsgDuplicate MessageStatus = "duplicate"
 	MsgUnmatched MessageStatus = "unmatched"
 	MsgError     MessageStatus = "error"
+	MsgSkipped   MessageStatus = "skipped"
 )
 
 type MessageResult struct {
