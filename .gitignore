@@ -31,6 +31,9 @@ captures/
 *.keystore
 !debug.keystore
 
+# Release APKs are distributed with the repo (attached to GitHub Releases too)
+!android-app/*.apk
+
 # --- IDE / Editors ---
 .idea/
 .vscode/
