@@ -118,6 +118,24 @@ SDK_E2E_MANAGEMENT_KEY=<management key> \
 pnpm test:e2e
 ```
 
+## Releasing to npm (manual)
+
+No CI/CD — releases are done by hand from your machine:
+
+```bash
+cd sdk
+npm view vindrapay-sdk        # one time: make sure the name is free
+
+pnpm typecheck && pnpm lint && pnpm test
+pnpm build                    # required: only dist/ is published
+
+npm version patch             # or minor/major: bumps version, commits, tags
+npm publish --access public   # use --otp=123456 if npm 2FA prompts
+git push --follow-tags
+```
+
+Preview what will be uploaded first with `npm pack --dry-run`. `README.md` and `LICENSE` are always included alongside `dist/`. Optionally create a GitHub Release from the pushed tag afterwards.
+
 ## License
 
 MIT

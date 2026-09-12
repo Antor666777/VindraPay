@@ -373,10 +373,17 @@ function globToRegExp(pattern: string): RegExp {
   return new RegExp(`^${escaped}$`)
 }
 
+type MockBody = Record<string, unknown>
+
 interface BuilderInput {
-  body: any
+  body: MockBody
   url: URL
 }
+
+const toMockBody = (value: unknown): MockBody =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as MockBody)
+    : {}
 
 type Builder = (input: BuilderInput) => unknown
 
@@ -456,47 +463,57 @@ export function createBackendMock(options: BackendMockOptions = {}): BackendMock
     return { items: items.slice(start, end), total: items.length }
   }
 
-  const providerFrom = (body: any) => ({
-    ...FIXTURES.provider,
-    name: body?.name ?? FIXTURES.provider.name,
-    sender_id: body?.sender_id ?? FIXTURES.provider.sender_id,
-    sms_template: body?.sms_template ?? FIXTURES.provider.sms_template,
-    priority:
-      typeof body?.priority === 'number' && body.priority >= 0 && body.priority <= 10000
-        ? body.priority
-        : FIXTURES.provider.priority,
-    direction: body?.direction ?? FIXTURES.provider.direction,
-    match_mode: body?.match_mode ?? FIXTURES.provider.match_mode,
-    script: typeof body?.script === 'string' && body.script !== '' ? body.script : null,
-    business_id: body?.business_id ?? FIXTURES.provider.business_id,
-  })
+  const providerFrom = (body: MockBody) => {
+    const priority = body.priority
+    const script = body.script
+    return {
+      ...FIXTURES.provider,
+      name: body?.name ?? FIXTURES.provider.name,
+      sender_id: body?.sender_id ?? FIXTURES.provider.sender_id,
+      sms_template: body?.sms_template ?? FIXTURES.provider.sms_template,
+      priority:
+        typeof priority === 'number' && priority >= 0 && priority <= 10000
+          ? priority
+          : FIXTURES.provider.priority,
+      direction: body?.direction ?? FIXTURES.provider.direction,
+      match_mode: body?.match_mode ?? FIXTURES.provider.match_mode,
+      script: typeof script === 'string' && script !== '' ? script : null,
+      business_id: body?.business_id ?? FIXTURES.provider.business_id,
+    }
+  }
 
-  const templateUpdateFrom = (body: any, url: URL) => ({
-    ...FIXTURES.provider,
-    id: segment(url, -2),
-    sms_template: body?.sms_template ?? FIXTURES.provider.sms_template,
-    direction: body?.direction ?? FIXTURES.provider.direction,
-    match_mode: body?.match_mode ?? FIXTURES.provider.match_mode,
-    script: typeof body?.script === 'string' && body.script !== '' ? body.script : null,
-  })
+  const templateUpdateFrom = (body: MockBody, url: URL) => {
+    const script = body.script
+    return {
+      ...FIXTURES.provider,
+      id: segment(url, -2),
+      sms_template: body?.sms_template ?? FIXTURES.provider.sms_template,
+      direction: body?.direction ?? FIXTURES.provider.direction,
+      match_mode: body?.match_mode ?? FIXTURES.provider.match_mode,
+      script: typeof script === 'string' && script !== '' ? script : null,
+    }
+  }
 
   const testProvider = ({ body }: BuilderInput) => {
     const fields = { amount: '1500.00', sender: 'MTN', trx_id: 'TRX8899123', balance: '24500.50' }
     const data: Record<string, unknown> = { match: true, fields }
-    if (typeof body?.script === 'string' && body.script !== '') {
+    const script = body.script
+    if (typeof script === 'string' && script !== '') {
       data.transformed = { amount: fields.amount }
     }
     return envelope(data)
   }
 
-  const calibrationFrom = ({ body, url }: BuilderInput) =>
-    envelope({
+  const calibrationFrom = ({ body, url }: BuilderInput) => {
+    const note = body.note
+    return envelope({
       ...FIXTURES.calibration,
       device_id: segment(url, -2),
       provider_id: body?.provider_id ?? FIXTURES.calibration.provider_id,
       balance: body?.balance ?? FIXTURES.calibration.balance,
-      note: typeof body?.note === 'string' && body.note !== '' ? body.note : FIXTURES.calibration.note,
+      note: typeof note === 'string' && note !== '' ? note : FIXTURES.calibration.note,
     })
+  }
 
   const balancePointFor = ({ url }: BuilderInput) => {
     const providerId = url.searchParams.get('provider_id')
@@ -521,7 +538,7 @@ export function createBackendMock(options: BackendMockOptions = {}): BackendMock
       const url = new URL(request.url)
       const ov = overrides.find((o) => o.method === method && o.pattern.test(request.url))
       const payload =
-        ov && ov.hasBody ? ov.body : build({ body: requestBody, url })
+        ov && ov.hasBody ? ov.body : build({ body: toMockBody(requestBody), url })
       if (payload instanceof Response) return payload
       const status = ov?.status ?? defaultStatus
       const headers = ov?.headers ?? undefined
@@ -643,11 +660,12 @@ export function createBackendMock(options: BackendMockOptions = {}): BackendMock
 
     bind('POST', '/device/v1/heartbeat', bearerGuard(deviceKey), 200, () => envelope(FIXTURES.heartbeat)),
     bind('POST', '/device/v1/messages', bearerGuard(deviceKey), 200, ({ body }) => {
-      if (!Array.isArray(body?.messages) || body.messages.length < 1 || body.messages.length > 50) {
+      const messages = body.messages
+      if (!Array.isArray(messages) || messages.length < 1 || messages.length > 50) {
         return HttpResponse.json(errorEnvelope('messages must contain 1-50 items'), { status: 400 })
       }
       return envelope({
-        results: body.messages.map((m: any) => ({
+        results: messages.map((m: MockBody) => ({
           client_msg_id: m?.client_msg_id ?? null,
           status: 'parsed',
         })),
