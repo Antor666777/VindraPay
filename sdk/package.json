@@ -1,78 +1,78 @@
-﻿{
-    "name":  "vindrapay-sdk",
-    "version":  "0.1.0",
-    "description":  "Official TypeScript SDK for the VindraPay payment-verification API.",
-    "type":  "module",
-    "license":  "MIT",
-    "main":  "./dist/index.cjs",
-    "module":  "./dist/index.js",
-    "types":  "./dist/index.d.ts",
-    "exports":  {
-                    ".":  {
-                              "types":  "./dist/index.d.ts",
-                              "import":  "./dist/index.js",
-                              "require":  "./dist/index.cjs",
-                              "default":  "./dist/index.cjs"
-                          },
-                    "./package.json":  "./package.json"
-                },
-    "typesVersions":  {
-                          "*":  {
-                                    ".":  [
-                                              "./dist/index.d.ts"
-                                          ]
-                                }
-                      },
-    "files":  [
-                  "dist"
-              ],
-    "sideEffects":  false,
-    "publishConfig":  {
-                          "access":  "public"
-                      },
-    "engines":  {
-                    "node":  "\u003e=18"
-                },
-    "packageManager":  "pnpm@11.22.0",
-    "repository":  {
-                       "type":  "git",
-                       "url":  "git+https://github.com/Antor666777/VindraPay.git",
-                       "directory":  "sdk"
-                   },
-    "homepage":  "https://github.com/Antor666777/VindraPay/tree/master/sdk",
-    "bugs":  {
-                 "url":  "https://github.com/Antor666777/VindraPay/issues"
-             },
-    "keywords":  [
-                     "vindrapay",
-                     "payments",
-                     "payment-verification",
-                     "api-client",
-                     "sdk",
-                     "typescript"
-                 ],
-    "scripts":  {
-                    "build":  "tsup",
-                    "test":  "vitest run",
-                    "test:contract":  "vitest run test/contract test/unit",
-                    "typecheck":  "tsc --noEmit",
-                    "lint":  "eslint .",
-                    "format":  "prettier --write .",
-                    "changeset":  "changeset",
-                    "test:e2e":  "vitest run --config vitest.e2e.config.ts",
-                    "release":  "pnpm build && changeset publish"
-                },
-    "devDependencies":  {
-                            "@changesets/changelog-github":  "^0.5.0",
-                            "@changesets/cli":  "^2.27.9",
-                            "@eslint/js":  "^9.15.0",
-                            "@types/node":  "^18.19.0",
-                            "eslint":  "^9.15.0",
-                            "msw":  "^2.7.4",
-                            "prettier":  "^3.4.0",
-                            "tsup":  "^8.3.0",
-                            "typescript":  "^5.6.3",
-                            "typescript-eslint":  "^8.15.0",
-                            "vitest":  "^3.2.0"
-                        }
+{
+    "name": "vindrapay-sdk",
+    "version": "0.1.2",
+    "description": "Official TypeScript SDK for the VindraPay payment-verification API.",
+    "type": "module",
+    "license": "MIT",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs",
+            "default": "./dist/index.cjs"
+        },
+        "./package.json": "./package.json"
+    },
+    "typesVersions": {
+        "*": {
+            ".": [
+                "./dist/index.d.ts"
+            ]
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "sideEffects": false,
+    "publishConfig": {
+        "access": "public"
+    },
+    "engines": {
+        "node": ">=18"
+    },
+    "packageManager": "pnpm@11.22.0",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Antor666777/VindraPay.git",
+        "directory": "sdk"
+    },
+    "homepage": "https://github.com/Antor666777/VindraPay/tree/master/sdk",
+    "bugs": {
+        "url": "https://github.com/Antor666777/VindraPay/issues"
+    },
+    "keywords": [
+        "vindrapay",
+        "payments",
+        "payment-verification",
+        "api-client",
+        "sdk",
+        "typescript"
+    ],
+    "scripts": {
+        "build": "tsup",
+        "test": "vitest run",
+        "test:contract": "vitest run test/contract test/unit",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint .",
+        "format": "prettier --write .",
+        "changeset": "changeset",
+        "test:e2e": "vitest run --config vitest.e2e.config.ts",
+        "release": "pnpm build && changeset publish"
+    },
+    "devDependencies": {
+        "@changesets/changelog-github": "^0.5.0",
+        "@changesets/cli": "^2.27.9",
+        "@eslint/js": "^9.15.0",
+        "@types/node": "^18.19.0",
+        "eslint": "^9.15.0",
+        "msw": "^2.7.4",
+        "prettier": "^3.4.0",
+        "tsup": "^8.3.0",
+        "typescript": "^5.6.3",
+        "typescript-eslint": "^8.15.0",
+        "vitest": "^3.2.0"
+    }
 }

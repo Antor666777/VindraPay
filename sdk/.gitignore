@@ -6,3 +6,6 @@ coverage/
 !.env.example
 *.tsbuildinfo
 .DS_Store
+
+# Maintainer-only local release notes (not published, not committed)
+RELEASING.local.md
